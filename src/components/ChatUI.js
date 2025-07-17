@@ -1,64 +1,28 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import Sidebar from './Sidebar';
 import ChatWindow from './ChatWindow';
 
-const ChatUI = ({ username, allUsers = [], onLogout }) => {
-  const [selectedUser, setSelectedUser] = useState(null);
-  const users = allUsers.filter(u => u.username !== username);
-
-  useEffect(() => {
-    if (!selectedUser && users.length > 0) {
-      setSelectedUser(users[0]);
-    }
-  }, [users, selectedUser]);
-
+export default function ChatUI({ username, socket, onLogout }) {
+  const [sel, setSel] = useState(null);
+  const headerSt = {
+    display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+    padding: '10px 20px', background: '#2e3a59', color: '#fff'
+  };
   return (
-    <div style={{ display: 'flex', height: '100vh', flexDirection: 'column' }}>
-      <div style={{
-        background: '#2e3a59',
-        color: '#fff',
-        padding: '10px 20px',
-        display: 'flex',
-        justifyContent: 'space-between',
-        alignItems: 'center'
-      }}>
-        <div><strong>Welcome, {username}</strong></div>
-        <button onClick={onLogout} style={{
-          background: '#ff4d4f',
-          border: 'none',
-          padding: '8px 14px',
-          borderRadius: '6px',
-          color: '#fff',
-          cursor: 'pointer'
-        }}>Logout</button>
+    <div style={{ display: 'flex', flexDirection: 'column', height: '100vh' }}>
+      <div style={headerSt}>
+        <span><strong>Welcome, {username}</strong></span>
+        <button onClick={onLogout} style={{ background: '#ff4d4f', border: 'none', padding: '6px 12px', borderRadius: 6, color: '#fff', cursor: 'pointer' }}>
+          Logout
+        </button>
       </div>
-
       <div style={{ display: 'flex', flex: 1 }}>
-        <Sidebar
-          users={users}
-          onUserClick={setSelectedUser}
-          selectedUser={selectedUser}
-        />
-        {selectedUser ? (
-          <ChatWindow
-            currentUser={username}
-            selectedUser={selectedUser.username}
-          />
-        ) : (
-          <div style={{
-            flex: 1,
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            fontSize: '20px',
-            background: '#f5f8fc'
-          }}>
-            Select a user to start chatting
-          </div>
-        )}
+        <Sidebar me={username} onSelect={setSel} selected={sel} />
+        {sel ? <ChatWindow me={username} other={sel} socket={socket} /> :
+          <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            <h3>Select a user to chat</h3>
+          </div>}
       </div>
     </div>
   );
-};
-
-export default ChatUI;
+}

@@ -1,189 +1,64 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect } from 'react';
+import io from 'socket.io-client';
+import axios from 'axios';
 import ChatUI from './components/ChatUI';
 
-function App() {
-  const [username, setUsername] = useState('');
-  const [password, setPassword] = useState('');
-  const [loggedIn, setLoggedIn] = useState(false);
-  const [users, setUsers] = useState([]);
-  const inputRef = useRef();
+const socket = io('http://localhost:5000');
+
+export default function App() {
+  const [user, setUser] = useState(JSON.parse(localStorage.getItem('chat-user')));
+  const [mode, setMode] = useState('login');
+  const [u, setU] = useState('');
+  const [p, setP] = useState('');
+  const [err, setErr] = useState('');
 
   useEffect(() => {
-    const storedUsers = JSON.parse(localStorage.getItem('users')) || [];
-    setUsers(storedUsers);
+    if (user) socket.emit('login', user.username);
+  }, [user]);
 
-    const lastUser = localStorage.getItem('loggedInUser');
-    if (lastUser) {
-      setUsername(lastUser);
-      setLoggedIn(true);
+  const handleAction = async () => {
+    if (!u.trim() || !p.trim()) return setErr('Enter both fields');
+    try {
+      const path = mode === 'login' ? '/api/login' : '/api/register';
+      const { data } = await axios.post('http://localhost:5000' + path, { username: u, password: p });
+      setUser(data);
+      localStorage.setItem('chat-user', JSON.stringify(data));
+      setErr('');
+    } catch (e) {
+      setErr(e.response?.data.error || 'Error occurred');
     }
-  }, []);
-
-  const handleLogin = () => {
-    if (!username.trim() || !password.trim()) {
-      alert('Please enter username and password');
-      inputRef.current.focus();
-      return;
-    }
-
-    const existingUser = users.find(u => u.username === username);
-    let updatedUsers = [...users];
-
-    if (existingUser) {
-      if (existingUser.password !== password) {
-        alert('Wrong password!');
-        return;
-      }
-    } else {
-      updatedUsers.push({ username, password });
-      localStorage.setItem('users', JSON.stringify(updatedUsers));
-    }
-
-    localStorage.setItem('loggedInUser', username);
-    setUsers(updatedUsers);
-    setLoggedIn(true);
   };
 
-  const handleLogout = () => {
-    setLoggedIn(false);
-    setUsername('');
-    setPassword('');
-    localStorage.removeItem('loggedInUser');
+  const logout = () => {
+    setUser(null);
+    localStorage.removeItem('chat-user');
+    setU(''); setP(''); setErr('');
   };
 
-  const handleKeyPress = (e) => {
-    if (e.key === 'Enter') handleLogin();
-  };
-
-  return (
-    <>
-      {!loggedIn ? (
-        <div style={styles.wrapper}>
-          <div style={styles.card}>
-            <div style={styles.logo}>🔐</div>
-            <h2 style={styles.title}>React Chat Login</h2>
-
-            <div style={styles.inputWrapper}>
-              <input
-                ref={inputRef}
-                type="text"
-                value={username}
-                onChange={(e) => setUsername(e.target.value)}
-                onKeyDown={handleKeyPress}
-                style={{
-                  ...styles.input,
-                  paddingTop: username ? '20px' : '14px',
-                }}
-              />
-              <label
-                style={{
-                  ...styles.label,
-                  top: username ? '6px' : '50%',
-                  fontSize: username ? '12px' : '14px',
-                  color: username ? '#333' : '#555',
-                }}
-              >
-                Username
-              </label>
-            </div>
-
-            <div style={styles.inputWrapper}>
-              <input
-                type="password"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                onKeyDown={handleKeyPress}
-                style={{
-                  ...styles.input,
-                  paddingTop: password ? '20px' : '14px',
-                }}
-              />
-              <label
-                style={{
-                  ...styles.label,
-                  top: password ? '6px' : '50%',
-                  fontSize: password ? '12px' : '14px',
-                  color: password ? '#333' : '#555',
-                }}
-              >
-                Password
-              </label>
-            </div>
-
-            <button style={styles.button} onClick={handleLogin}>
-              Let’s Chat
-            </button>
-          </div>
+  if (!user) {
+    const st = {
+      cont: { display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
+        minHeight: '100vh', background: 'linear-gradient(to right, #141e30, #243b55)', color: '#fff', fontFamily: 'Poppins' },
+      input: { width: 280, padding: 10, margin: '8px 0', borderRadius: 8, border: 'none' },
+      button: { padding: 12, width: 300, background: '#0072ff', color: '#fff', border: 'none', borderRadius: 8, cursor: 'pointer' },
+      error: { color: '#ff4d4f', marginTop: 10 },
+      toggle: { marginTop: 12, color: '#00c6ff', cursor: 'pointer', textDecoration: 'underline' }
+    };
+    return (
+      <div style={st.cont}>
+        <h2>{mode === 'login' ? 'Login' : 'Register'}</h2>
+        <input placeholder="Username" value={u} onChange={e => setU(e.target.value)} style={st.input} />
+        <input type="password" placeholder="Password" value={p} onChange={e => setP(e.target.value)} style={st.input} />
+        <button style={st.button} onClick={handleAction}>
+          {mode === 'login' ? 'Login' : 'Register'}
+        </button>
+        {err && <div style={st.error}>{err}</div>}
+        <div style={st.toggle} onClick={() => setMode(mode === 'login' ? 'register' : 'login')}>
+          {mode === 'login' ? 'New user? Register' : 'Have account? Login'}
         </div>
-      ) : (
-        <ChatUI username={username} allUsers={users} onLogout={handleLogout} />
-      )}
-    </>
-  );
+      </div>
+    );
+  }
+
+  return <ChatUI username={user.username} socket={socket} onLogout={logout} />;
 }
-
-const styles = {
-  wrapper: {
-    minHeight: '100vh',
-    background: 'linear-gradient(to right top, #141e30, #243b55)',
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'center',
-    fontFamily: 'Poppins, sans-serif',
-  },
-  card: {
-    background: 'rgba(255, 255, 255, 0.05)',
-    borderRadius: '16px',
-    boxShadow: '0 8px 40px rgba(0,0,0,0.3)',
-    backdropFilter: 'blur(15px)',
-    padding: '50px 40px',
-    textAlign: 'center',
-    width: '90%',
-    maxWidth: '400px',
-    color: '#fff',
-  },
-  logo: {
-    fontSize: '48px',
-    marginBottom: '15px',
-  },
-  title: {
-    fontSize: '24px',
-    marginBottom: '30px',
-    fontWeight: '600',
-  },
-  inputWrapper: {
-    position: 'relative',
-    marginBottom: '25px',
-    textAlign: 'left',
-  },
-  input: {
-    width: '100%',
-    padding: '14px 12px',
-    fontSize: '16px',
-    borderRadius: '8px',
-    border: '1px solid #aaa',
-    background: 'rgba(255,255,255,0.85)',
-    color: '#000',
-  },
-  label: {
-    position: 'absolute',
-    left: '12px',
-    transform: 'translateY(-50%)',
-    fontSize: '14px',
-    pointerEvents: 'none',
-  },
-  button: {
-    width: '106%',
-    padding: '14px',
-    fontSize: '16px',
-    background: '#00c6ff',
-    backgroundImage: 'linear-gradient(to right, #0072ff, #00c6ff)',
-    color: '#fff',
-    border: 'none',
-    borderRadius: '8px',
-    cursor: 'pointer',
-    fontWeight: '600',
-  },
-};
-
-export default App;
